@@ -14,36 +14,22 @@ async def init_db():
 
 async def add_user(telegram_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
-
-        await db.execute("""
-            INSERT OR IGNORE INTO users (telegram_id)
-            VALUES (?)
-        """, (telegram_id,))
+        await db.execute(
+            "INSERT OR IGNORE INTO users (telegram_id) VALUES (?)",
+            (telegram_id,)
+        )
         await db.commit()
 
 async def get_user(telegram_id):
     await add_user(telegram_id)
     async with aiosqlite.connect(DATABASE_NAME) as db:
-        async with db.execute("""
-            SELECT used_pages
-            FROM users
-            WHERE telegram_id = ?
-        """, (telegram_id,)) as cursor:
+        async with db.execute(
+            "SELECT used_pages FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cursor:
             result = await cursor.fetchone()
             return result[0]
 
 async def get_remaining_pages(telegram_id):
     used_pages = await get_user(telegram_id)
     return max(0, FREE_LIMIT - used_pages)
-
-async def consume_page(telegram_id):
-    async with aiosqlite.connect(DATABASE_NAME) as db:
-        await db.execute("BEGIN IMMEDIATE")
-        cursor = await db.execute("""
-            UPDATE users
-            SET used_pages = used_pages + 1
-            WHERE telegram_id = ?
-            AND used_pages < ?
-        """, (telegram_id, FREE_LIMIT))
-        await db.commit()
-        return cursor.rowcount == 1
